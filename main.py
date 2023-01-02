@@ -11,6 +11,7 @@ import time
 import tkinter as tk
 from tkinter import ttk
 from typing import Dict
+import pandas
 
 import Levenshtein
 import cv2
@@ -404,6 +405,9 @@ def frame_to_move(image_frame):
             if lev_dist <= 0.4:
                 text.removesuffix("をつかつた")
                 lev_dist = string_distance(x, text)
+        if "ー" in x:
+            if lev_dist <= 0.5:
+                continue
         if x == "ツインビーム":
             if lev_dist <= 0.55:
                 continue
@@ -516,22 +520,26 @@ def damage_calculate():
             continue
         move = move_data[poke_move]
         move_index = Weakness[move["type"].upper()].index
-        multi = Weakness[poke_data["type_1"].upper()].multi[move_index]
-        if "type_2" in poke_data:
-            multi *= Weakness[poke_data["type_2"].upper()].multi[move_index]
+        multi = Weakness[enemy_poke["type_1"].upper()].multi[move_index]
+        print("first-multi", str(multi))
+        print("f-m", Weakness[enemy_poke["type_1"].upper()].name)
+        if "type_2" in enemy_poke:
+            multi *= Weakness[enemy_poke["type_2"].upper()].multi[move_index]
+            print("second-multi", str(multi))
+            print("s-m", Weakness[enemy_poke["type_2"].upper()].name)
         move_class = move["class"]
         power = move["power"]
         if move_class == "Ph":
-            special_attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
-                                   poke.character.upper[1])
+            attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
+                           poke.character.upper[1])
             health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
             h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
             defense = floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
             b252 = floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
-            damage_min = floor(floor(floor(floor(22 * power * special_attack / defense) / 50 + 2) * multi) * 0.86)
-            damage_max = floor(floor(floor(22 * power * special_attack / defense) / 50 + 2) * multi)
-            b252_damage_min = floor(floor(floor(floor(22 * power * special_attack / b252) / 50 + 2) * multi) * 0.86)
-            b252_damage_max = floor(floor(floor(22 * power * special_attack / b252) / 50 + 2) * multi)
+            damage_min = floor(floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi) * 0.86)
+            damage_max = floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi)
+            b252_damage_min = floor(floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi) * 0.86)
+            b252_damage_max = floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi)
             move_list[index - 1].set(poke_move)
             move_damage_list[index - 1].set(str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
                 floor(damage_max / health * 100 * 10) / 10) + "%")
@@ -542,9 +550,9 @@ def damage_calculate():
         elif move_class == "Sp":
             special_attack = floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
                                    poke.character.upper[3])
-            print("sp_attack" + str(special_attack))
+            print("sp_attack", str(special_attack))
             health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
-            print("hp" + str(health))
+            print("hp", str(health))
             h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
             sp_defense = floor((enemy_poke["D"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
             print("sp_d", str(sp_defense))
@@ -553,9 +561,11 @@ def damage_calculate():
             print("damage-min", str(damage_min))
             damage_max = floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi)
             print("damage-max", str(damage_max))
+            print("index", str(move_index))
+            print("multi", str(multi))
             d252_damage_min = floor(floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi) * 0.86)
             d252_damage_max = floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi)
-
+            print("movelist", str(len(move_list)))
             move_list[index - 1].set(poke_move)
             move_damage_list[index - 1].set(str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
                 floor(damage_max / health * 100 * 10) / 10) + "%")
