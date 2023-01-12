@@ -1,21 +1,21 @@
 # coding: utf-8
-
-import base64
+import ctypes
 import enum
-import io
 import json
 import os
 import sys
 import threading
 import time
 import tkinter as tk
+import traceback
+from tkinter import filedialog
 from tkinter import ttk
+from tkinter import messagebox
+from types import TracebackType
 from typing import Dict
-import pandas
 
 import Levenshtein
 import cv2
-import numpy as np
 import pyocr
 import pyocr.builders
 from PIL import Image, ImageFont
@@ -111,6 +111,12 @@ move_damage_list: list[tk.StringVar] = list()
 move_h252_damage_list: list[tk.StringVar] = list()
 move_hbd252_damage_list: list[tk.StringVar] = list()
 
+poke_list_list: list[tk.StringVar] = list()
+move_list_list: list[tk.StringVar] = list()
+move_damage_list_list: list[list[tk.StringVar]] = list()
+move_h252_damage_list_list: list[list[tk.StringVar]] = list()
+move_hbd252_damage_list_list: list[list[tk.StringVar]] = list()
+
 now = False
 end = False
 
@@ -126,6 +132,11 @@ def tk_main():
     global enemy_poke_suggest
     global move_list
     global move_damage_list
+    global poke_list_list
+    global move_list_list
+    global move_damage_list_list
+    global move_h252_damage_list_list
+    global move_hbd252_damage_list_list
 
     def remove_all_items():
         global end
@@ -137,26 +148,109 @@ def tk_main():
         exit(2)
 
     def save_poke():
-        pick_poke_list.clear()
-        for x, y, state_list, upper_list, moves, seikaku in poke_selects:
-            data = PokeData()
-            data.name = x.get()
-            data.enable = y.get()
+        try:
+            pick_poke_list.clear()
+            for x, y, state_list, upper_list, moves, seikaku in poke_selects:
+                if x.get() == "":
+                    continue
+                data = PokeData()
+                data.name = x.get()
+                data.enable = y.get()
 
-            for state_index, single_state in enumerate(["H", "A", "B", "C", "D", "S"]):
-                data.state[single_state] = state_list[state_index].get()
-                data.upper[single_state] = upper_list[state_index].get()
-            for move in moves:
-                data.moves.append(move.get())
-            data.character = next((f for f in list(Character) if f.japanese == seikaku.get()), None)
-            pick_poke_list[x.get()] = data
-        poke_save_info_str.set("Saved")
+                for state_index, single_state in enumerate(["H", "A", "B", "C", "D", "S"]):
+                    data.state[single_state] = state_list[state_index].get()
+                    data.upper[single_state] = upper_list[state_index].get()
+                for move in moves:
+                    data.moves.append(move.get())
+                data.character = next((f for f in list(Character) if f.japanese == seikaku.get().replace("\n", "")),
+                                      Character.MAJIME)
+                pick_poke_list[x.get()] = data
+            poke_save_info_str.set("Saved")
 
+            def delete_saved():
+                time.sleep(3)
+                poke_save_info_str.set("")
+
+            threading.Thread(target=delete_saved).start()
+        except (Exception,):
+            t, v, tb = sys.exc_info()
+            messagebox.showerror("Error", "\n".join(traceback.format_exception(t, v, tb)))
+
+    def save_poke_as_file():
         def delete_saved():
             time.sleep(3)
             poke_save_info_str.set("")
 
-        threading.Thread(target=delete_saved).start()
+        try:
+            file = filedialog.asksaveasfile(defaultextension="poke", filetypes=[("Poke", "*.poke")],
+                                            initialdir=os.path.abspath("party"))
+            if file is None:
+                poke_save_info_str.set("Cancel")
+                threading.Thread(target=delete_saved).start()
+                return
+            for x, y, state_list, upper_list, moves, seikaku in poke_selects:
+                if x.get() == "":
+                    continue
+                file.write(x.get() + "," + " ".join(map(lambda up_str: str(up_str.get()), state_list)) + "," + " ".join(
+                    map(lambda up_str: str(up_str.get()), upper_list)) + "," + " ".join(
+                    map(lambda move_str: move_str.get(), moves)) + "," + seikaku.get() + "\n")
+            file.close()
+            poke_save_info_str.set("Saved")
+            threading.Thread(target=delete_saved).start()
+        except (Exception,):
+            t, v, tb = sys.exc_info()
+            messagebox.showerror("Error", "\n".join(traceback.format_exception(t, v, tb)))
+
+    def load_poke():
+        try:
+            pick_poke_list.clear()
+            file = filedialog.askopenfile(defaultextension="poke", filetypes=[("Poke", "*.poke")],
+                                          initialdir=os.path.abspath("party"))
+            if file is None:
+                return
+            for line_index, line in enumerate(file.readlines()):
+                for x_index, x in enumerate(line.split(",")):
+                    if x_index == 0:
+                        poke_selects[line_index][0].set(x)
+                    elif x_index == 1:
+                        for state_index, ori_state in enumerate(x.split(" ")):
+                            poke_selects[line_index][2][state_index].set(int(ori_state))
+                    elif x_index == 2:
+                        for upper_index, ori_upper in enumerate(x.split(" ")):
+                            poke_selects[line_index][3][upper_index].set(int(ori_upper))
+                    elif x_index == 3:
+                        for move_index, ori_move in enumerate(x.split(" ")):
+                            poke_selects[line_index][4][move_index].set(ori_move)
+                    elif x_index == 4:
+                        poke_selects[line_index][5].set(x)
+        except (Exception,):
+            t, v, tb = sys.exc_info()
+            messagebox.showerror("Error", "\n".join(traceback.format_exception(t, v, tb)))
+        save_poke()
+
+    def other_poke_menu():
+        top = tk.Toplevel(master=gui)
+        top.geometry("1000x1100")
+        top.grab_set()
+        top.focus_force()
+        top.transient(gui)
+
+        for i in range(0, 10):
+            tk.Entry(master=top, state="readonly", textvariable=poke_list_list[i], width=25).place(x=0, y=50 + 100 * i)
+            tk.Label(master=top, text="努力値無振り").place(x=0, y=70 + 100 * i)
+            tk.Label(master=top, text="H252振り").place(x=0, y=90 + 100 * i)
+            tk.Label(master=top, text="HBD252振り").place(x=0, y=110 + 100 * i)
+        for i in range(0, 4):
+            tk.Entry(master=top, state="readonly", textvariable=move_list_list[i], width=25).place(x=100 + 200 * i,
+                                                                                                   y=25)
+            for i_2 in range(0, 10):
+                tk.Entry(master=top, state="readonly", textvariable=move_damage_list_list[i_2][i], width=25).place(
+                    x=100 + 200 * i, y=70 + 100 * i_2)
+                tk.Entry(master=top, state="readonly", textvariable=move_h252_damage_list_list[i_2][i], width=25).place(
+                    x=100 + 200 * i, y=90 + 100 * i_2)
+                tk.Entry(master=top, state="readonly", textvariable=move_hbd252_damage_list_list[i_2][i],
+                         width=25).place(x=100 + 200 * i, y=110 + 100 * i_2)
+        top.mainloop()
 
     gui = tk.Tk()
     gui.title("Pokémon Info")
@@ -167,12 +261,23 @@ def tk_main():
     poke_spec_suggest = tk.StringVar()
     move_spec_suggest = tk.StringVar()
     enemy_poke_suggest = tk.StringVar()
+    for i in range(0, 10):
+        poke_list_list.append(tk.StringVar())
+        move_damage_list_list.append(list())
+        move_h252_damage_list_list.append(list())
+        move_hbd252_damage_list_list.append(list())
+        for i_2 in range(0, 4):
+            move_damage_list_list[i].append(tk.StringVar())
+            move_h252_damage_list_list[i].append(tk.StringVar())
+            move_hbd252_damage_list_list[i].append(tk.StringVar())
     for i in range(0, 4):
         move_list.append(tk.StringVar())
         move_damage_list.append(tk.StringVar())
         move_h252_damage_list.append(tk.StringVar())
         move_hbd252_damage_list.append(tk.StringVar())
-    tk.Button(master=gui, text="close", foreground='red', command=remove_all_items, width=10).place(x=100, y=300)
+        move_list_list.append(tk.StringVar())
+
+    tk.Button(master=gui, text="Close", foreground='red', command=remove_all_items, width=10).place(x=100, y=300)
 
     poke_list = list(pokemon_data.keys())
 
@@ -242,6 +347,14 @@ def tk_main():
     poke_save = tk.Button(master=gui, text="Save", foreground="green", command=save_poke, width=10)
     poke_save.place(x=100, y=210)
 
+    poke_save_as_file = tk.Button(master=gui, text="Save As File", foreground="blue", command=save_poke_as_file,
+                                  width=20)
+    poke_save_as_file.place(x=100, y=240)
+
+    poke_load = tk.Button(master=gui, text="Load", foreground="purple", command=load_poke,
+                          width=20)
+    poke_load.place(x=100, y=270)
+
     poke_save_info_str = tk.StringVar()
     poke_save_info = tk.Entry(master=gui, state="readonly", textvariable=poke_save_info_str, width=8)
     poke_save_info.place(x=190, y=213)
@@ -267,6 +380,12 @@ def tk_main():
     tk.Label(master=gui, text="努力値無振り").place(x=798, y=270)
     tk.Label(master=gui, text="H252振り").place(x=948, y=270)
     tk.Label(master=gui, text="HBD252振り").place(x=1098, y=270)
+    tk.Button(master=gui, text="名前から判断できないキャラ", foreground="green", command=other_poke_menu).place(x=1300, y=330)
+    root_menu = tk.Menu(master=gui)
+    gui.config(menu=root_menu)
+
+    setting_menu = tk.Menu(master=gui, tearoff=0)
+    root_menu.add_cascade(label="設定", menu=setting_menu)
     for i in range(-1, 3):
         tk.Entry(master=gui, state="readonly", textvariable=move_list[i], width=20).place(x=650, y=350 + i * 50)
         tk.Entry(master=gui, state="readonly", textvariable=move_damage_list[i], width=20).place(x=800, y=350 + i * 50)
@@ -280,25 +399,6 @@ def tk_main():
 
 ws = obsws("localhost", 4444, "tororo")
 ws.connect()
-
-
-def pil2cv(image):
-    new_image = np.array(image, dtype=np.uint8)
-    if new_image.ndim == 2:  # モノクロ
-        pass
-    elif new_image.shape[2] == 3:  # カラー
-        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
-    elif new_image.shape[2] == 4:  # 透過
-        new_image = cv2.cvtColor(new_image, cv2.COLOR_RGBA2BGRA)
-    return new_image
-
-
-def pil_to_base64(img):
-    buffer = io.BytesIO()
-    img.save(buffer, "png")
-    img_str = base64.b64encode(buffer.getvalue()).decode("ascii")
-
-    return img_str
 
 
 def string_distance(x, text):
@@ -499,12 +599,86 @@ def frame_to_move(image_frame):
 
 
 def damage_calculate():
+    def attack_cal(poke, poke_data, enemy_poke, move):
+        if move["power"] == 0:
+            return ("0.0%~0.0% (0~0)",
+                    "0.0%~0.0% (0~0)",
+                    "0.0%~0.0% (0~0)")
+        move_type = Weakness[move["type"].upper()].multi
+        multi = move_type[Weakness[enemy_poke["type_1"].upper()].index]
+        if "type_2" in enemy_poke:
+            multi *= move_type[Weakness[enemy_poke["type_2"].upper()].index]
+        if move["type"] == poke_data["type_1"]:
+            multi *= 1.5
+        elif "type_2" in poke_data:
+            if move["type"] == poke_data["type_2"]:
+                multi *= 1.5
+        power = move["power"]
+        attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
+                       poke.character.upper[1])
+        health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
+        h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
+        defense = floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
+        b252 = floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
+        damage_min = floor(floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi) * 0.86)
+        damage_max = floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi)
+        b252_damage_min = floor(floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi) * 0.86)
+        b252_damage_max = floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi)
+        return (str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
+            floor(damage_max / health * 100 * 10) / 10) + "% (" + str(int(damage_min)) + "~" + str(
+            int(damage_max)) + ")",
+                str(floor(damage_min / h252 * 100 * 10) / 10) + "%~" + str(
+                    floor(damage_max / h252 * 100 * 10) / 10) + "% (" + str(int(damage_min)) + "~" + str(
+                    int(damage_max)) + ")",
+                str(floor(b252_damage_min / h252 * 100 * 10) / 10) + "%~" + str(
+                    floor(b252_damage_max / h252 * 100 * 10) / 10) + "% (" + str(int(b252_damage_min)) + "~" + str(
+                    int(b252_damage_max)) + ")"
+                )
+
+    def sp_attack_cal(poke, poke_data, enemy_poke, move):
+        if move["power"] == 0:
+            return ("0.0%~0.0% (0~0)",
+                    "0.0%~0.0% (0~0)",
+                    "0.0%~0.0% (0~0)")
+        move_type = Weakness[move["type"].upper()].multi
+        multi = move_type[Weakness[enemy_poke["type_1"].upper()].index]
+        if "type_2" in enemy_poke:
+            multi *= move_type[Weakness[enemy_poke["type_2"].upper()].index]
+        if move["type"] == poke_data["type_1"]:
+            multi *= 1.5
+        elif "type_2" in poke_data:
+            if move["type"] == poke_data["type_2"]:
+                multi *= 1.5
+        power = move["power"]
+        special_attack = floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
+                               poke.character.upper[3])
+        health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
+        h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
+        sp_defense = floor((enemy_poke["D"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
+        d252 = floor((enemy_poke["D"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
+        damage_min = floor(floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi) * 0.86)
+        damage_max = floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi)
+        d252_damage_min = floor(floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi) * 0.86)
+        d252_damage_max = floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi)
+        move_list[index - 1].set(poke_move)
+        return (str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
+            floor(damage_max / health * 100 * 10) / 10) + "% (" + str(int(damage_min)) + "~" + str(
+            int(damage_max)) + ")",
+                str(floor(damage_min / h252 * 100 * 10) / 10) + "%~" + str(
+                    floor(damage_max / h252 * 100 * 10) / 10) + "% (" + str(int(damage_min)) + "~" + str(
+                    int(damage_max)) + ")",
+                str(floor(d252_damage_min / h252 * 100 * 10) / 10) + "%~" + str(
+                    floor(d252_damage_max / h252 * 100 * 10) / 10) + "% (" + str(int(d252_damage_min)) + "~" + str(
+                    int(d252_damage_max)) + ")"
+                )
+
     global move_list
     global move_damage_list
     global pick_poke_list
     global pokemon_data
     global move_h252_damage_list
     global move_hbd252_damage_list
+    global poke_list_list, move_list_list, move_damage_list_list, move_h252_damage_list_list, move_hbd252_damage_list_list
     if poke_spec_suggest.get() == "" or enemy_poke_suggest.get() == "":
         return
     if poke_spec_suggest.get() not in pick_poke_list:
@@ -519,60 +693,45 @@ def damage_calculate():
         if poke_move == "":
             continue
         move = move_data[poke_move]
-        move_index = Weakness[move["type"].upper()].index
-        multi = Weakness[enemy_poke["type_1"].upper()].multi[move_index]
-        print("first-multi", str(multi))
-        print("f-m", Weakness[enemy_poke["type_1"].upper()].name)
-        if "type_2" in enemy_poke:
-            multi *= Weakness[enemy_poke["type_2"].upper()].multi[move_index]
-            print("second-multi", str(multi))
-            print("s-m", Weakness[enemy_poke["type_2"].upper()].name)
         move_class = move["class"]
-        power = move["power"]
+        if enemy_poke["name"] == "List":
+            for i, pokemon in enumerate(enemy_poke["list"]):
+                ene_poke = pokemon_data[pokemon]
+                poke_list_list[i - 1].set(pokemon)
+                if move_class == "St":
+                    move_list_list[index - 1].set(poke_move)
+                if move_class == "Ph":
+                    cal = attack_cal(poke, poke_data, ene_poke, move)
+
+                    move_list_list[index - 1].set(poke_move)
+                    move_damage_list_list[i - 1][index - 1].set(cal[0])
+                    move_h252_damage_list_list[i - 1][index - 1].set(cal[1])
+                    move_hbd252_damage_list_list[i - 1][index - 1].set(cal[2])
+                elif move_class == "Sp":
+                    cal = sp_attack_cal(poke, poke_data, ene_poke, move)
+
+                    move_list_list[index - 1].set(poke_move)
+                    move_damage_list_list[i - 1][index - 1].set(cal[0])
+                    move_h252_damage_list_list[i - 1][index - 1].set(cal[1])
+                    move_hbd252_damage_list_list[i - 1][index - 1].set(cal[2])
+            continue
+        if move_class == "St":
+            move_list[index - 1].set(poke_move)
+            continue
         if move_class == "Ph":
-            attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
-                           poke.character.upper[1])
-            health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
-            h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
-            defense = floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-            b252 = floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
-            damage_min = floor(floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi) * 0.86)
-            damage_max = floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi)
-            b252_damage_min = floor(floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi) * 0.86)
-            b252_damage_max = floor(floor(floor(22 * power * attack / b252) / 50 + 2) * multi)
+            cal = attack_cal(poke, poke_data, enemy_poke, move)
+
             move_list[index - 1].set(poke_move)
-            move_damage_list[index - 1].set(str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
-                floor(damage_max / health * 100 * 10) / 10) + "%")
-            move_h252_damage_list[index - 1].set(str(floor(damage_min / h252 * 100 * 10) / 10) + "%~" + str(
-                floor(damage_max / h252 * 100 * 10) / 10) + "%")
-            move_hbd252_damage_list[index - 1].set(str(floor(b252_damage_min / h252 * 100 * 10) / 10) + "%~" + str(
-                floor(b252_damage_max / h252 * 100 * 10) / 10) + "%")
+            move_damage_list[index - 1].set(cal[0])
+            move_h252_damage_list[index - 1].set(cal[1])
+            move_hbd252_damage_list[index - 1].set(cal[2])
         elif move_class == "Sp":
-            special_attack = floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
-                                   poke.character.upper[3])
-            print("sp_attack", str(special_attack))
-            health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
-            print("hp", str(health))
-            h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
-            sp_defense = floor((enemy_poke["D"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-            print("sp_d", str(sp_defense))
-            d252 = floor((enemy_poke["D"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
-            damage_min = floor(floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi) * 0.86)
-            print("damage-min", str(damage_min))
-            damage_max = floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi)
-            print("damage-max", str(damage_max))
-            print("index", str(move_index))
-            print("multi", str(multi))
-            d252_damage_min = floor(floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi) * 0.86)
-            d252_damage_max = floor(floor(floor(22 * power * special_attack / d252) / 50 + 2) * multi)
-            print("movelist", str(len(move_list)))
+            cal = sp_attack_cal(poke, poke_data, enemy_poke, move)
+
             move_list[index - 1].set(poke_move)
-            move_damage_list[index - 1].set(str(floor(damage_min / health * 100 * 10) / 10) + "%~" + str(
-                floor(damage_max / health * 100 * 10) / 10) + "%")
-            move_h252_damage_list[index - 1].set(str(floor(damage_min / h252 * 100 * 10) / 10) + "%~" + str(
-                floor(damage_max / h252 * 100 * 10) / 10) + "%")
-            move_hbd252_damage_list[index - 1].set(str(floor(d252_damage_min / h252 * 100 * 10) / 10) + "%~" + str(
-                floor(d252_damage_max / h252 * 100 * 10) / 10) + "%")
+            move_damage_list[index - 1].set(cal[0])
+            move_h252_damage_list[index - 1].set(cal[1])
+            move_hbd252_damage_list[index - 1].set(cal[2])
 
 
 def main_task():
