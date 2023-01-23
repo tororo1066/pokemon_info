@@ -90,7 +90,7 @@ class Weakness(enum.Enum):
 
 # 仮置き
 class HeldItem(enum.Enum):
-    NONE = ("なし", [1.0,1.0,1.0,1.0,1.0,1.0], None,None)
+    NONE = ("なし", [1.0, 1.0, 1.0, 1.0, 1.0, 1.0], None, None)
 
     MUSCLE_BAND = ("ちからのハチマキ", [1.0, 1.1, 1.0, 1.0, 1.0, 1.0], None, None)
     WISE_GLASSES = ("ものしりメガネ", [1.0, 1.0, 1.0, 1.1, 1.0, 1.0], None, None)
@@ -124,13 +124,15 @@ class HeldItem(enum.Enum):
 
 
 class PokeData:
-    name = ""
-    enable = False
-    state = {}
-    upper = {}
-    moves = []
-    character = Character.MAJIME
-    held_item = HeldItem.NONE
+
+    def __init__(self):
+        self.name = ""
+        self.enable = False
+        self.state = {}
+        self.upper = {}
+        self.moves = []
+        self.character = Character.MAJIME
+        self.held_item = HeldItem.NONE
 
 
 move_data = json.load(open("moves/moves.json", "r", encoding="utf-8_sig"))
@@ -194,7 +196,7 @@ def tk_main():
                 ws.call(requests.DeleteSceneItem(x["name"]))
         ws.disconnect()
         end = True
-        exit(2)
+        sys.exit(0)
 
     def save_poke():
         try:
@@ -421,7 +423,8 @@ def tk_main():
         poke_label.place(x=30, y=i * 30)
         poke_box.place(x=100, y=i * 30)
         poke_check.place(x=260, y=i * 30)
-        poke_selects.append((poke_box, poke_bool, poke_state_list, poke_upper_list, poke_move_list, poke_seikaku, poke_held_item))
+        poke_selects.append(
+            (poke_box, poke_bool, poke_state_list, poke_upper_list, poke_move_list, poke_seikaku, poke_held_item))
 
     poke_save = tk.Button(master=gui, text="Save", foreground="green", command=save_poke, width=10)
     poke_save.place(x=100, y=210)
@@ -701,11 +704,14 @@ def set_poke_s():
     if poke_spec_suggest.get() != "" and poke_spec_suggest.get() in pick_poke_list:
         poke = pick_poke_list[poke_spec_suggest.get()]
         poke_data = pokemon_data[poke_spec_suggest.get()]
-        s = floor(
-            floor((poke_data["S"] * 2 + poke.state[5] + poke.upper[5] / 4) * 50 / 100 + 5) * poke.character.upper[5])
+        s = floor(floor(
+            floor((poke_data["S"] * 2 + poke.state["S"] + poke.upper["S"] / 4) * 50 / 100 + 5) * poke.character.upper[
+                5]) * poke.held_item.multi[5])
         pick_poke_s.set(str(int(s)))
     if enemy_poke_suggest.get() != "" and enemy_poke_suggest.get() in pokemon_data:
         poke_data = pokemon_data[enemy_poke_suggest.get()]
+        if poke_data["name"] == "List":
+            return
         slowest_s = floor(floor((poke_data["S"] * 2 + 0 + 0 / 4) * 50 / 100 + 5) * 0.9)
         slow_s = floor(floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * 0.9)
         normal_s = floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
@@ -878,26 +884,28 @@ def damage_calculate():
                     move_max_damage_list_list[i - 1][index - 1].set(cal[4])
             continue
         if move_class == "St":
-            move_list[index - 1].set(poke_move)
+            move_list[index].set(poke_move)
             continue
         if move_class == "Ph":
             cal = attack_cal(poke, poke_data, enemy_poke, move)
 
-            move_list[index - 1].set(poke_move)
-            move_damage_list[index - 1].set(cal[0])
-            move_h4_damage_list[index - 1].set(cal[1])
-            move_h252_damage_list[index - 1].set(cal[2])
-            move_hbd252_damage_list[index - 1].set(cal[3])
-            move_max_damage_list[index - 1].set(cal[4])
+            move_list[index].set(poke_move)
+            move_damage_list[index].set(cal[0])
+            move_h4_damage_list[index].set(cal[1])
+            move_h252_damage_list[index].set(cal[2])
+            move_hbd252_damage_list[index].set(cal[3])
+            move_max_damage_list[index].set(cal[4])
         elif move_class == "Sp":
             cal = sp_attack_cal(poke, poke_data, enemy_poke, move)
-
-            move_list[index - 1].set(poke_move)
-            move_damage_list[index - 1].set(cal[0])
-            move_h4_damage_list[index - 1].set(cal[1])
-            move_h252_damage_list[index - 1].set(cal[2])
-            move_hbd252_damage_list[index - 1].set(cal[3])
-            move_max_damage_list[index - 1].set(cal[4])
+            print(poke.moves)
+            print(index)
+            print(poke_move)
+            move_list[index].set(poke_move)
+            move_damage_list[index].set(cal[0])
+            move_h4_damage_list[index].set(cal[1])
+            move_h252_damage_list[index].set(cal[2])
+            move_hbd252_damage_list[index].set(cal[3])
+            move_max_damage_list[index].set(cal[4])
 
 
 def test(camera, frame):
@@ -924,7 +932,7 @@ def main_task():
     camera.set(cv2.CAP_PROP_FPS, 30)
     ret, frame = camera.read()
     if ret is True:
-        while camera.read()[0] is True:
+        while camera.read()[0] and not end:
             ret, frame = camera.read()
             frame_to_move(frame)
             frame_to_pokemon(frame)
@@ -934,6 +942,7 @@ def main_task():
             damage_calculate()
         camera.release()
         cv2.destroyAllWindows()
+        sys.exit(0)
 
 
 if __name__ == '__main__':
