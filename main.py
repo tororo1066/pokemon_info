@@ -934,12 +934,15 @@ def main_task():
     if ret is True:
         while camera.read()[0] and not end:
             ret, frame = camera.read()
-            frame_to_move(frame)
-            frame_to_pokemon(frame)
-            frame_to_enemy_pokemon(frame)
-            # test(camera, frame)
-            set_poke_s()
-            damage_calculate()
+            try:
+                frame_to_move(frame)
+                frame_to_pokemon(frame)
+                frame_to_enemy_pokemon(frame)
+                # test(camera, frame)
+                set_poke_s()
+                damage_calculate()
+            except RuntimeError:
+                break
         camera.release()
         cv2.destroyAllWindows()
         sys.exit(0)
