@@ -7,11 +7,13 @@ import threading
 import time
 import tkinter as tk
 import traceback
+import webbrowser
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 from typing import Dict
 
+import yaml
 import Levenshtein
 import cv2
 import numpy as np
@@ -165,11 +167,32 @@ enemy_poke_s: list[tk.StringVar] = list()
 terastal_image = cv2.imread(os.path.abspath("compareImages/terastal.png"))
 
 now = False
+damage_cal_menu_open_now = False
+other_poke_menu_open_now = False
 end = False
 
 test_running = False
 
 now_pokemon: PokeData
+
+config_yml = yaml.safe_load(open('config/config.yml').read())
+
+ws = obsws(config_yml["obs"]["host"], config_yml["obs"]["port"], config_yml["obs"]["pass"])
+
+
+def get_width() -> int:
+    return config_yml["size"]["width"]
+
+
+def get_height() -> int:
+    return config_yml["size"]["height"]
+
+
+def int_only(P):
+    if P == "" or P.isnumeric():
+        return True
+    else:
+        return False
 
 
 def tk_main():
@@ -290,11 +313,19 @@ def tk_main():
         save_poke()
 
     def other_poke_menu():
+        global other_poke_menu_open_now
+        if other_poke_menu_open_now:
+            return
+        other_poke_menu_open_now = True
+
+        def on_close():
+            global other_poke_menu_open_now
+            other_poke_menu_open_now = False
+            top.destroy()
+
         top = tk.Toplevel(master=gui)
-        top.geometry("1000x1050")
-        top.grab_set()
+        top.geometry("900x1100")
         top.focus_force()
-        top.transient(gui)
 
         for i in range(0, 7):
             tk.Entry(master=top, state="readonly", textvariable=poke_list_list[i], width=15).place(x=0, y=50 + 140 * i)
@@ -317,6 +348,105 @@ def tk_main():
                          width=25).place(x=100 + 200 * i, y=130 + 140 * i_2)
                 tk.Entry(master=top, state="readonly", textvariable=move_max_damage_list_list[i_2][i],
                          width=25).place(x=100 + 200 * i, y=150 + 140 * i_2)
+
+        top.protocol("WM_DELETE_WINDOW", on_close)
+        top.mainloop()
+
+    def damage_cal_menu():
+        global damage_cal_menu_open_now
+        if damage_cal_menu_open_now:
+            return
+
+        damage_cal_menu_open_now = True
+
+        def on_close():
+            global damage_cal_menu_open_now
+            damage_cal_menu_open_now = False
+            top.destroy()
+
+        top = tk.Toplevel()
+        top.title("ダメージ計算")
+        top.geometry("820x250")
+        top.focus_force()
+
+        tk.Button(master=top, text="名前から判断できないキャラ", foreground="green", command=other_poke_menu).place(x=0,
+                                                                                                           y=200)
+
+        tk.Entry(master=top, state="readonly", textvariable=enemy_poke_suggest, width=15).place(x=0, y=50)
+        tk.Label(master=top, text="努力値無振り").place(x=0, y=70)
+        tk.Label(master=top, text="H4振り").place(x=0, y=90)
+        tk.Label(master=top, text="H252振り").place(x=0, y=110)
+        tk.Label(master=top, text="HBD252振り").place(x=0, y=130)
+        tk.Label(master=top, text="HBD252振り+性格").place(x=0, y=150)
+
+        for i in range(0, 4):
+            tk.Entry(master=top, state="readonly", textvariable=move_list[i], width=25).place(x=100 + 180 * i,
+                                                                                              y=25)
+            tk.Entry(master=top, state="readonly", textvariable=move_damage_list[i], width=25).place(
+                x=100 + 180 * i, y=70)
+            tk.Entry(master=top, state="readonly", textvariable=move_h4_damage_list[i], width=25).place(
+                x=100 + 180 * i, y=90)
+            tk.Entry(master=top, state="readonly", textvariable=move_h252_damage_list[i], width=25).place(
+                x=100 + 180 * i, y=110)
+            tk.Entry(master=top, state="readonly", textvariable=move_hbd252_damage_list[i],
+                     width=25).place(x=100 + 180 * i, y=130)
+            tk.Entry(master=top, state="readonly", textvariable=move_max_damage_list[i],
+                     width=25).place(x=100 + 180 * i, y=150)
+
+        top.protocol("WM_DELETE_WINDOW", on_close)
+        top.mainloop()
+
+    def setting_menu():
+        global config_yml
+
+        def on_close():
+
+            if fps.get() < 30:
+                if not messagebox.askyesno("警告！", "fpsの設定が30未満だとうまく処理ができない可能性があります。\n続行しますか？"):
+                    return
+
+            config_yml["size"]["width"] = width.get()
+            config_yml["size"]["height"] = height.get()
+            config_yml["fps"] = fps.get()
+
+            with open("config/config.yml", "r+") as f:
+                yaml.dump_all([config_yml], f, sort_keys=False)
+
+            top.quit()
+            top.destroy()
+
+        def valid(string: str):
+            if string == "":
+                return True
+            return string.isnumeric()
+
+        top = tk.Toplevel(master=gui)
+        top.title("詳細設定")
+        top.geometry("600x800")
+        top.grab_set()
+        top.focus_force()
+        top.transient(gui)
+        int_only_vcmd = top.register(func=valid)
+        width = tk.IntVar(master=top, value=config_yml["size"]["width"])
+        height = tk.IntVar(master=top, value=config_yml["size"]["height"])
+        fps = tk.IntVar(master=top, value=config_yml["fps"])
+
+        tk.Label(master=top, text="ゲームのウィンドウの大きさ").place(x=10, y=20)
+        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=width, width=5).place(
+            x=140,
+            y=20)
+        tk.Label(master=top, text="x").place(x=166, y=20)
+        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=height, width=5).place(
+            x=176,
+            y=20)
+
+        tk.Label(master=top, text="ゲームのfps").place(x=10, y=45)
+        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=fps, width=5).place(
+            x=140,
+            y=45)
+
+        top.protocol("WM_DELETE_WINDOW", on_close)
+
         top.mainloop()
 
     gui = tk.Tk()
@@ -487,14 +617,16 @@ def tk_main():
     root_menu = tk.Menu(master=gui)
     gui.config(menu=root_menu)
 
-    setting_menu = tk.Menu(master=gui, tearoff=0)
-    root_menu.add_cascade(label="設定", menu=setting_menu)
+    setting_bar = tk.Menu(master=gui, tearoff=0)
+    view_bar = tk.Menu(master=gui, tearoff=0)
+    view_bar.add_command(label="ダメージ計算のウィンドウを個別で表示する", command=damage_cal_menu)
+    setting_bar.add_command(label="詳細設定", command=setting_menu)
+    root_menu.add_cascade(label="表示", menu=view_bar)
+    root_menu.add_cascade(label="設定", menu=setting_bar)
+
+    gui.protocol("WM_DELETE_WINDOW", remove_all_items)
 
     gui.mainloop()
-
-
-ws = obsws("localhost", 4444, "tororo")
-ws.connect()
 
 
 def string_distance(x, text):
@@ -513,12 +645,13 @@ def string_distance(x, text):
 def frame_to_pokemon(image_frame):
     global pick_poke_list
     gray = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-    modify = cv2.threshold(gray[890:935, 100:400], 200, 255, cv2.THRESH_BINARY)[1]
+    modify = cv2.threshold(
+        gray[int(get_height() * 0.824):int(get_height() * 0.866), int(get_width() * 0.052):int(get_width() * 0.208)],
+        200, 255, cv2.THRESH_BINARY)[1]
 
     text = tool.image_to_string(Image.fromarray(modify), lang="jpn",
                                 builder=pyocr.builders.TextBuilder(tesseract_layout=7)).replace(" ", "")
     poke_spec_str.set(text)
-    poke_spec_suggest.set("")
     if text == "":
         return
     near_data: Dict[float, str] = {}
@@ -534,7 +667,9 @@ def frame_to_pokemon(image_frame):
 
 def frame_to_enemy_pokemon(image_frame):
     gray = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-    modify = cv2.threshold(gray[95:145, 1535:1820], 200, 255, cv2.THRESH_BINARY)[1]
+    modify = cv2.threshold(
+        gray[int(get_height() * 0.088):int(get_height() * 0.134), int(get_width() * 0.799):int(get_width() * 0.948)],
+        200, 255, cv2.THRESH_BINARY)[1]
     image = Image.fromarray(modify)
 
     text = tool.image_to_string(image, lang="jpn",
@@ -552,7 +687,6 @@ def frame_to_enemy_pokemon(image_frame):
     chi_tra = tool.image_to_string(image, lang="chi_tra",
                                    builder=pyocr.builders.TextBuilder(tesseract_layout=7))
     enemy_poke_spec.set(text)
-    enemy_poke_suggest.set("")
     if text == "":
         return
     near_data: Dict[float, str] = {}
@@ -590,12 +724,13 @@ def frame_to_enemy_pokemon(image_frame):
 def frame_to_move(image_frame):
     global now
     gray = cv2.cvtColor(image_frame, cv2.COLOR_BGR2GRAY)
-    modify = cv2.threshold(gray[857:910, 284:1350], 200, 255, cv2.THRESH_BINARY)[1]
+    modify = cv2.threshold(
+        gray[int(get_height() * 0.793):int(get_height() * 0.843), int(get_width() * 0.148):int(get_width() * 0.703)],
+        200, 255, cv2.THRESH_BINARY)[1]
     text = tool.image_to_string(Image.fromarray(modify), lang="jpn",
                                 builder=pyocr.builders.TextBuilder(tesseract_layout=7))
     text = text.replace("/", "").replace("!", "").replace("攻", "").replace("撃", "").replace(" ", "")
     move_spec_str.set(text)
-    move_spec_suggest.set("")
     if text == "":
         return
     near_data: Dict[float, str] = {}
@@ -861,27 +996,27 @@ def damage_calculate():
         if enemy_poke["name"] == "List":
             for i, pokemon in enumerate(enemy_poke["list"]):
                 ene_poke = pokemon_data[pokemon]
-                poke_list_list[i - 1].set(pokemon)
+                poke_list_list[i].set(pokemon)
                 if move_class == "St":
-                    move_list_list[index - 1].set(poke_move)
+                    move_list_list[index].set(poke_move)
                 if move_class == "Ph":
                     cal = attack_cal(poke, poke_data, ene_poke, move)
 
-                    move_list_list[index - 1].set(poke_move)
-                    move_damage_list_list[i - 1][index - 1].set(cal[0])
-                    move_h4_damage_list_list[i - 1][index - 1].set(cal[1])
-                    move_h252_damage_list_list[i - 1][index - 1].set(cal[2])
-                    move_hbd252_damage_list_list[i - 1][index - 1].set(cal[3])
-                    move_max_damage_list_list[i - 1][index - 1].set(cal[4])
+                    move_list_list[index].set(poke_move)
+                    move_damage_list_list[i][index].set(cal[0])
+                    move_h4_damage_list_list[i][index].set(cal[1])
+                    move_h252_damage_list_list[i][index].set(cal[2])
+                    move_hbd252_damage_list_list[i][index].set(cal[3])
+                    move_max_damage_list_list[i][index].set(cal[4])
                 elif move_class == "Sp":
                     cal = sp_attack_cal(poke, poke_data, ene_poke, move)
 
-                    move_list_list[index - 1].set(poke_move)
-                    move_damage_list_list[i - 1][index - 1].set(cal[0])
-                    move_h4_damage_list_list[i - 1][index - 1].set(cal[1])
-                    move_h252_damage_list_list[i - 1][index - 1].set(cal[2])
-                    move_hbd252_damage_list_list[i - 1][index - 1].set(cal[3])
-                    move_max_damage_list_list[i - 1][index - 1].set(cal[4])
+                    move_list_list[index].set(poke_move)
+                    move_damage_list_list[i][index].set(cal[0])
+                    move_h4_damage_list_list[i][index].set(cal[1])
+                    move_h252_damage_list_list[i][index].set(cal[2])
+                    move_hbd252_damage_list_list[i][index].set(cal[3])
+                    move_max_damage_list_list[i][index].set(cal[4])
             continue
         if move_class == "St":
             move_list[index].set(poke_move)
@@ -897,9 +1032,6 @@ def damage_calculate():
             move_max_damage_list[index].set(cal[4])
         elif move_class == "Sp":
             cal = sp_attack_cal(poke, poke_data, enemy_poke, move)
-            print(poke.moves)
-            print(index)
-            print(poke_move)
             move_list[index].set(poke_move)
             move_damage_list[index].set(cal[0])
             move_h4_damage_list[index].set(cal[1])
@@ -924,14 +1056,49 @@ def test(camera, frame):
 
 
 def main_task():
-    global end
-    threading.Thread(target=tk_main).start()
-    camera = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    camera.set(cv2.CAP_PROP_FPS, 30)
+    global end, ws
+    try:
+        ws.connect()
+    except (Exception,):
+        def on_close():
+            config_yml["obs"]["host"] = host.get()
+            config_yml["obs"]["port"] = int(port.get())
+            config_yml["obs"]["pass"] = password.get()
+            with open("config/config.yml", "r+") as f:
+                yaml.dump_all([config_yml], f, sort_keys=False)
+            setting.destroy()
+            sys.exit(0)
+
+        messagebox.showinfo("設定エラー",
+                            "obsに接続できませんでした\nWebSocketの指定をしてください(obsが起動されてないと接続できません)\n(このウィンドウを閉じると移動します)")
+        setting = tk.Tk()
+        vcmd = setting.register(int_only)
+        setting.title("WebSocketの指定をする")
+        setting.geometry("300x120")
+        setting.focus_force()
+        tk.Label(master=setting, text="ホスト").place(x=0, y=20)
+        host = tk.Entry(master=setting, textvariable=tk.StringVar(value=config_yml["obs"]["host"]))
+        host.place(x=100, y=20)
+        tk.Label(master=setting, text="ポート").place(x=0, y=40)
+        port = tk.Entry(master=setting, textvariable=tk.IntVar(value=config_yml["obs"]["port"]),
+                        validatecommand=(vcmd, "%P"), validate='all')
+        port.place(x=100, y=40)
+        tk.Label(master=setting, text="パスワード").place(x=0, y=60)
+        password = tk.Entry(master=setting, textvariable=tk.StringVar(value=config_yml["obs"]["pass"]))
+        password.place(x=100, y=60)
+        tk.Label(master=setting, text="ウィンドウを閉じると設定します").place(x=0, y=80)
+        url = tk.Label(master=setting, text="詳しくはこちらから", foreground="blue")
+        url.bind("<Button-1>", lambda e: webbrowser.open_new("https://google.com"))
+        url.place(x=0, y=100)
+        setting.protocol("WM_DELETE_WINDOW", on_close)
+        setting.mainloop()
+    camera = cv2.VideoCapture(config_yml["cameraIndex"], cv2.CAP_DSHOW)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, get_height())
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, get_width())
+    camera.set(cv2.CAP_PROP_FPS, config_yml["fps"])
     ret, frame = camera.read()
     if ret is True:
+        threading.Thread(target=tk_main).start()
         while camera.read()[0] and not end:
             ret, frame = camera.read()
             try:
@@ -941,11 +1108,35 @@ def main_task():
                 # test(camera, frame)
                 set_poke_s()
                 damage_calculate()
+                time.sleep(1 / config_yml["fps"])
             except RuntimeError:
                 break
         camera.release()
         cv2.destroyAllWindows()
         sys.exit(0)
+    else:
+        def on_close():
+            config_yml["cameraIndex"] = int(spinbox.get())
+            with open("config/config.yml", "r+") as f:
+                yaml.dump_all([config_yml], f, sort_keys=False)
+            setting.destroy()
+            sys.exit(0)
+
+        messagebox.showinfo("設定エラー", "カメラが読み込めませんでした\nカメラのidを指定してください\n(このウィンドウを閉じると移動します)")
+        setting = tk.Tk()
+        vcmd = setting.register(int_only)
+        setting.title("カメラidを設定する(0から)")
+        setting.geometry("300x80")
+        setting.focus_force()
+        spinbox = tk.Spinbox(master=setting, increment=1, textvariable=tk.IntVar(value=config_yml["cameraIndex"]),
+                             from_=0, to=999, validatecommand=(vcmd, "%P"), validate='all')
+        spinbox.place(x=0, y=20)
+        tk.Label(master=setting, text="ウィンドウを閉じると設定します").place(x=0, y=40)
+        url = tk.Label(master=setting, text="詳しくはこちらから", foreground="blue")
+        url.bind("<Button-1>", lambda e: webbrowser.open_new("https://google.com"))
+        url.place(x=0, y=60)
+        setting.protocol("WM_DELETE_WINDOW", on_close)
+        setting.mainloop()
 
 
 if __name__ == '__main__':

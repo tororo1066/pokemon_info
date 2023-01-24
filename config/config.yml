@@ -1,0 +1,9 @@
+size:
+  height: 1080
+  width: 1920
+fps: 30
+cameraIndex: 1
+obs:
+  host: localhost
+  port: 4444
+  pass: tororo
