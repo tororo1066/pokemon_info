@@ -431,19 +431,20 @@ def tk_main():
         height = tk.IntVar(master=top, value=config_yml["size"]["height"])
         fps = tk.IntVar(master=top, value=config_yml["fps"])
 
-        tk.Label(master=top, text="ゲームのウィンドウの大きさ").place(x=10, y=20)
+        tk.Label(master=top, text="ソフト再起動後に反映").place(x=10, y=10)
+        tk.Label(master=top, text="ゲームのウィンドウの大きさ").place(x=10, y=40)
         tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=width, width=5).place(
             x=140,
-            y=20)
-        tk.Label(master=top, text="x").place(x=166, y=20)
+            y=40)
+        tk.Label(master=top, text="x").place(x=166, y=40)
         tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=height, width=5).place(
             x=176,
-            y=20)
+            y=40)
 
-        tk.Label(master=top, text="ゲームのfps").place(x=10, y=45)
+        tk.Label(master=top, text="ゲームのfps").place(x=10, y=65)
         tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=fps, width=5).place(
             x=140,
-            y=45)
+            y=65)
 
         top.protocol("WM_DELETE_WINDOW", on_close)
 
