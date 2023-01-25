@@ -188,7 +188,7 @@ def get_height() -> int:
     return config_yml["size"]["height"]
 
 
-def int_only(P):
+def int_only(P) -> bool:
     if P == "" or P.isnumeric():
         return True
     else:
@@ -696,25 +696,25 @@ def frame_to_enemy_pokemon(image_frame):
         if "parent" in value:
             continue
         lev_dist = string_distance(value["jpn"], text)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             if "," in value["eng"]:
                 for splitEng in value["eng"].split(","):
                     lev_dist = string_distance(splitEng, eng)
-                    if lev_dist > 0.33:
+                    if lev_dist > 0.44:
                         break
             else:
                 lev_dist = string_distance(value["eng"], eng)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             lev_dist = string_distance(value["deu"], deu)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             lev_dist = string_distance(value["fra"], fra)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             lev_dist = string_distance(value["kor"], kor)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             lev_dist = string_distance(value["chi-sim"], chi_sim)
-        if lev_dist <= 0.33:
+        if lev_dist <= 0.44:
             lev_dist = string_distance(value["chi-tra"], chi_tra)
-        if lev_dist > 0.33:
+        if lev_dist > 0.44:
             near_data[lev_dist] = key
     if len(near_data) != 0:
         lev = max(near_data)
@@ -748,9 +748,6 @@ def frame_to_move(image_frame):
                 continue
         if x == "ツインビーム":
             if lev_dist <= 0.55:
-                continue
-        if x == "ソーラービーム":
-            if lev_dist <= 0.50:
                 continue
         if lev_dist > 0.4:
             near_data[lev_dist] = x
