@@ -20,11 +20,11 @@ Save As Fileをクリックすればファイルとして保存でき、次か�
 ![img.png](readmeFiles/img3.png)\
 **パーティを保存**: Saveと同じです\
 **パーティをファイルとして保存**: Save As Fileと同じです\
-**パーティをファイルから読み込む**: Loadと同じです\
+**パーティをファイルから読み込む**: Loadと同じです
 
 ## 表示
 ![img.png](readmeFiles/img4.png)\
-**ダメージ計算のウィンドウを個別で表示する**: ダメ計をコンパクトに表すウィンドウを表示します\
+**ダメージ計算のウィンドウを個別で表示する**: ダメ計をコンパクトに表すウィンドウを表示します
 [詳しくはこちら](https://github.com/tororo1066/pokemon_info/wiki/%E3%83%80%E3%83%A1%E3%83%BC%E3%82%B8%E8%A8%88%E7%AE%97%E3%81%AE%E8%A6%8B%E6%96%B9)
 ![img.png](readmeFiles/img5.png)
 **Debug Menu**: デバッグ用のメニューです 触らなくて大丈夫です
@@ -35,3 +35,7 @@ Save As Fileをクリックすればファイルとして保存でき、次か�
 
 # ダメージ計算の見方
 [ここを参照](https://github.com/tororo1066/pokemon_info/wiki/%E3%83%80%E3%83%A1%E3%83%BC%E3%82%B8%E8%A8%88%E7%AE%97%E3%81%AE%E8%A6%8B%E6%96%B9)
+
+# 将来的に対応したい...もの
+- 被ダメージ計算
+- 特性考慮

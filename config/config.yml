@@ -7,7 +7,7 @@ delay: 0
 obs:
   host: localhost
   port: 4444
-  pass: tororo
+  pass: pass
 
 
 
