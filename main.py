@@ -17,6 +17,7 @@ from typing import Dict
 
 import Levenshtein
 import cv2
+import numpy as np
 import pyocr
 import pyocr.builders
 import yaml
@@ -145,8 +146,9 @@ class PokeData:
         self.moves = []
         self.character = Character.MAJIME
         self.held_item = HeldItem.NONE
-        self.game_upper = [Fraction(1, 1), Fraction(1, 1), Fraction(1, 1), Fraction(1, 1), Fraction(1, 1)]
+        self.game_upper = [Fraction(1, 1), Fraction(1, 1), Fraction(1, 1), Fraction(1, 1), Fraction(1, 1), Fraction(1, 1)]
         self.terastal = ""
+        self.prevent_terastal = ""
 
 
 with open("moves/moves.json", "r", encoding="utf-8_sig") as f:
@@ -181,6 +183,7 @@ enemy_poke_s: list[tk.StringVar] = list()
 
 state_check_image = cv2.imread(os.path.abspath("compareImages/state_check.png"))
 check_my_poke_image = cv2.imread(os.path.abspath("compareImages/check_my_poke.png"))
+initialize_check_image = cv2.imread(os.path.abspath("compareImages/initialize_check.png"))
 terastal_types_image = dict()
 for file in glob.glob(os.path.abspath("compareImages/terastal_type/*.png")):
     terastal_types_image[os.path.basename(file).replace(".png", "")] = cv2.imread(file)
@@ -195,6 +198,7 @@ check_one_lang: tk.BooleanVar
 one_lang: tk.StringVar
 
 enable_held_item: tk.BooleanVar
+enable_prevent_terastal: tk.BooleanVar
 
 test_running = False
 
@@ -255,7 +259,7 @@ def tk_main():
     global move_h4_damage_list_list, move_h4_damage_list, move_max_damage_list, move_max_damage_list_list
     global pick_poke_s, enemy_poke_s
     global check_one_lang, one_lang, enable_held_item
-    global terastal_type_suggest, enemy_terastal_type_suggest, upper_suggest, enemy_upper_suggest
+    global terastal_type_suggest, enemy_terastal_type_suggest, upper_suggest, enemy_upper_suggest, enable_prevent_terastal
 
     def remove_all_items():
         global end
@@ -270,7 +274,7 @@ def tk_main():
     def save_poke():
         try:
             pick_poke_list.clear()
-            for x, y, state_list, upper_list, moves, character, held_item in poke_selects:
+            for x, y, state_list, upper_list, moves, character, held_item, terastal in poke_selects:
                 if x.get() == "":
                     continue
                 data = PokeData()
@@ -286,6 +290,7 @@ def tk_main():
                                       Character.MAJIME)
                 data.held_item = next((f for f in list(HeldItem) if f.japanese == held_item.get().replace("\n", "")),
                                       HeldItem.NONE)
+                data.prevent_terastal = type_japanese_to_english(terastal.get().replace("\n", ""))
                 pick_poke_list[x.get()] = data
             poke_save_info_str.set("Saved")
 
@@ -310,18 +315,59 @@ def tk_main():
                 poke_save_info_str.set("Cancel")
                 threading.Thread(target=delete_saved).start()
                 return
-            for x, y, state_list, upper_list, moves, character, held_item in poke_selects:
+            for x, y, state_list, upper_list, moves, character, held_item, terastal in poke_selects:
                 if x.get() == "":
                     continue
                 file.write(x.get() + "," + " ".join(map(lambda up_str: str(up_str.get()), state_list)) + "," + " ".join(
                     map(lambda up_str: str(up_str.get()), upper_list)) + "," + " ".join(
-                    map(lambda move_str: move_str.get(), moves)) + "," + character.get() + "," + held_item.get())
+                    map(lambda move_str: move_str.get(), moves)) + "," + character.get() + "," + held_item.get().replace("\n","") + "," + terastal.get() + "\n")
+
             file.close()
             poke_save_info_str.set("Saved")
             threading.Thread(target=delete_saved).start()
         except (Exception,):
             t, v, tb = sys.exc_info()
             messagebox.showerror("Error", "\n".join(traceback.format_exception(t, v, tb)))
+
+    def type_japanese_to_english(type):
+        if type == "ノーマル":
+            return "normal"
+        elif type == "ほのお":
+            return "fire"
+        elif type == "みず":
+            return "water"
+        elif type == "でんき":
+            return "electric"
+        elif type == "くさ":
+            return "grass"
+        elif type == "こおり":
+            return "ice"
+        elif type == "かくとう":
+            return "fighting"
+        elif type == "どく":
+            return "poison"
+        elif type == "じめん":
+            return "ground"
+        elif type == "ひこう":
+            return "flying"
+        elif type == "エスパー":
+            return "psychic"
+        elif type == "むし":
+            return "bug"
+        elif type == "いわ":
+            return "rock"
+        elif type == "ゴースト":
+            return "ghost"
+        elif type == "ドラゴン":
+            return "dragon"
+        elif type == "あく":
+            return "dark"
+        elif type == "はがね":
+            return "steel"
+        elif type == "フェアリー":
+            return "fairy"
+        else:
+            return type
 
     def load_poke():
         def delete_saved():
@@ -353,6 +399,8 @@ def tk_main():
                         poke_selects[line_index][5].set(x)
                     elif x_index == 5:
                         poke_selects[line_index][6].set(x)
+                    elif x_index == 6:
+                        poke_selects[line_index][7].set(x)
         except (Exception,):
             t, v, tb = sys.exc_info()
             messagebox.showerror("Error", "\n".join(traceback.format_exception(t, v, tb)))
@@ -449,6 +497,8 @@ def tk_main():
             tk.Entry(master=top, state="readonly", textvariable=enemy_poke_s[i], width=4).place(x=120 + i * 35, y=270)
         tk.Label(master=top, text="持ち物を有効にする").place(x=180, y=190)
         tk.Checkbutton(master=top, variable=enable_held_item).place(x=280, y=190)
+        tk.Label(master=top, text="仮テラスタル").place(x=320, y=190)
+        tk.Checkbutton(master=top, variable=enable_prevent_terastal).place(x=380, y=190)
         top.protocol("WM_DELETE_WINDOW", on_close)
         top.mainloop()
 
@@ -458,7 +508,9 @@ def tk_main():
         def on_close():
             config_yml["size"]["width"] = width.get()
             config_yml["size"]["height"] = height.get()
+            config_yml["delay"] = delay.get()
             config_yml["fps"] = fps.get()
+            config_yml["cameraIndex"] = cameraIndex.get()
 
             with open("config/config.yml", "r+") as f:
                 yaml.dump_all([config_yml], f, sort_keys=False)
@@ -470,6 +522,11 @@ def tk_main():
                 return True
             return string.isnumeric()
 
+        def valid_double(string: str):
+            if string == "":
+                return True
+            return string.isdigit()
+
         top = tk.Toplevel(master=gui)
         top.title("詳細設定")
         top.geometry("600x800")
@@ -479,7 +536,9 @@ def tk_main():
         int_only_vcmd = top.register(func=valid)
         width = tk.IntVar(master=top, value=config_yml["size"]["width"])
         height = tk.IntVar(master=top, value=config_yml["size"]["height"])
+        delay = tk.DoubleVar(master=top, value=config_yml["delay"])
         fps = tk.IntVar(master=top, value=config_yml["fps"])
+        cameraIndex = tk.IntVar(master=top, value=config_yml["cameraIndex"])
 
         tk.Label(master=top, text="ソフト再起動後に反映").place(x=10, y=10)
         tk.Label(master=top, text="ゲームのウィンドウの大きさ").place(x=10, y=40)
@@ -491,10 +550,18 @@ def tk_main():
             x=176,
             y=40)
 
-        tk.Label(master=top, text="1分間に何回画像処理をするか").place(x=10, y=65)
-        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=fps, width=5).place(
-            x=190,
+        tk.Label(master=top, text="画像処理の遅延(秒)").place(x=10, y=65)
+        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=delay, width=5).place(
+            x=140,
             y=65)
+        tk.Label(master=top, text="fps").place(x=10, y=85)
+        tk.Entry(master=top, validate="all", validatecommand=(top.register(func=valid_double), "%P"), textvariable=fps, width=5).place(
+            x=140,
+            y=85)
+        tk.Label(master=top, text="仮想カメラの番号").place(x=10, y=105)
+        tk.Entry(master=top, validate="all", validatecommand=(int_only_vcmd, "%P"), textvariable=cameraIndex, width=5).place(
+            x=140,
+            y=105)
 
         top.protocol("WM_DELETE_WINDOW", on_close)
 
@@ -520,7 +587,7 @@ def tk_main():
 
     gui = tk.Tk()
     gui.title("Pokémon Info")
-    gui.geometry("1900x550")
+    gui.geometry("1830x550")
     poke_spec_str = tk.StringVar()
     move_spec_str = tk.StringVar()
     enemy_poke_spec = tk.StringVar()
@@ -530,6 +597,7 @@ def tk_main():
     pick_poke_s = tk.StringVar()
     check_one_lang = tk.BooleanVar(value=False)
     enable_held_item = tk.BooleanVar(value=True)
+    enable_prevent_terastal = tk.BooleanVar(value=False)
     one_lang = tk.StringVar()
 
     terastal_type_suggest = tk.StringVar()
@@ -586,49 +654,50 @@ def tk_main():
         poke_check = tk.Checkbutton(master=gui, text="選出", variable=poke_bool)
         poke_seikaku = tk.StringVar(value="まじめ")
         poke_held_item = tk.StringVar(value="なし")
+        poke_terastal_type = tk.StringVar(value="ノーマル")
         vcmd = (gui.register(state_int_only))
         vcmd2 = (gui.register(upper_int_only))
 
         poke_state_list = []
         for index, state in enumerate(["H", "A", "B", "C", "D", "S"]):
-            tk.Label(master=gui, text=state).place(x=320 + index * 45, y=i * 30)
+            tk.Label(master=gui, text=state).place(x=290 + index * 45, y=i * 30)
             poke_state_val = tk.IntVar(value=31)
             poke_state_box = tk.Spinbox(master=gui, validate='all', validatecommand=(vcmd, "%P"), width=2, from_=0,
                                         to=31, increment=1, textvariable=poke_state_val)
-            poke_state_box.place(x=335 + index * 45, y=i * 30)
+            poke_state_box.place(x=305 + index * 45, y=i * 30)
             poke_state_list.append(poke_state_val)
 
         poke_upper_list = []
         for index, upper in enumerate(["H", "A", "B", "C", "D", "S"]):
-            tk.Label(master=gui, text=upper).place(x=595 + index * 50, y=i * 30)
+            tk.Label(master=gui, text=upper).place(x=565 + index * 50, y=i * 30)
             poke_upper_val = tk.IntVar(value=0)
             poke_upper_box = tk.Spinbox(master=gui, validate='all', validatecommand=(vcmd2, "%P"), width=3, from_=0,
                                         to=252, increment=252, textvariable=poke_upper_val)
-            poke_upper_box.place(x=610 + index * 50, y=i * 30)
+            poke_upper_box.place(x=580 + index * 50, y=i * 30)
             poke_upper_list.append(poke_upper_val)
 
         poke_move_list = []
         for index in range(1, 5):
-            tk.Label(master=gui, text="技" + str(index)).place(x=800 + index * 150, y=i * 30)
             poke_move_val = tk.StringVar()
             poke_move_box = ttk.Combobox(master=gui, values=list(move_data.keys()), textvariable=poke_move_val,
                                          width=15)
-            poke_move_box.place(x=830 + index * 150, y=i * 30)
+            poke_move_box.place(x=750 + index * 130, y=i * 30)
             poke_move_list.append(poke_move_val)
 
-        tk.Label(master=gui, text="性格").place(x=1550, y=i * 30)
         ttk.Combobox(master=gui, values=list(map(lambda x: x.japanese, list(Character))), textvariable=poke_seikaku,
-                     width=10).place(x=1580, y=i * 30)
+                     width=8).place(x=1400, y=i * 30)
 
-        tk.Label(master=gui, text="持ち物").place(x=1680, y=i * 30)
         ttk.Combobox(master=gui, values=list(map(lambda x: x.japanese, list(HeldItem))), textvariable=poke_held_item,
-                     width=18).place(x=1720, y=i * 30)
+                     width=18).place(x=1485, y=i * 30)
 
-        poke_label.place(x=30, y=i * 30)
-        poke_box.place(x=100, y=i * 30)
-        poke_check.place(x=260, y=i * 30)
+        ttk.Combobox(master=gui, values=["ノーマル", "ほのお", "みず", "でんき", "くさ", "こおり", "かくとう", "どく", "じめん", "ひこう", "エスパー", "むし", "いわ", "ゴースト", "ドラゴン", "あく", "はがね", "フェアリー"], textvariable=poke_terastal_type,
+                     width=8).place(x=1630, y=i * 30)
+
+        poke_label.place(x=10, y=i * 30)
+        poke_box.place(x=70, y=i * 30)
+        poke_check.place(x=230, y=i * 30)
         poke_selects.append(
-            (poke_box, poke_bool, poke_state_list, poke_upper_list, poke_move_list, poke_seikaku, poke_held_item))
+            (poke_box, poke_bool, poke_state_list, poke_upper_list, poke_move_list, poke_seikaku, poke_held_item,poke_terastal_type))
 
     poke_save = tk.Button(master=gui, text="Save", foreground="green", command=save_poke, width=10)
     poke_save.place(x=100, y=210)
@@ -667,8 +736,13 @@ def tk_main():
     tk.Label(master=gui, text="予測した技").place(x=450, y=420)
     tk.Entry(master=gui, state="readonly", textvariable=move_spec_suggest, width=25).place(x=450, y=450)
 
-    tk.Label(master=gui, text="個体値").place(x=320, y=0)
-    tk.Label(master=gui, text="努力値").place(x=595, y=0)
+    tk.Label(master=gui, text="個体値").place(x=290, y=0)
+    tk.Label(master=gui, text="努力値").place(x=565, y=0)
+    for i in range(1, 5):
+        tk.Label(master=gui, text="技" + str(i)).place(x=750 + i * 130, y=0)
+    tk.Label(master=gui, text="性格").place(x=1400, y=0)
+    tk.Label(master=gui, text="持ち物").place(x=1485, y=0)
+    tk.Label(master=gui, text="テラスタイプ").place(x=1630, y=0)
 
     tk.Label(master=gui, text="ダメージ計算").place(x=648, y=270)
     tk.Label(master=gui, text="努力値無振り").place(x=798, y=270)
@@ -975,25 +1049,27 @@ def attack_cal(poke, poke_data, enemy_poke, move):
         return "無効", "無効", "無効", "無効", "無効"
     move_type = Weakness[move["type"].upper()].multi
     if enemy_poke["name"] in enemy_poke_info_list and enemy_poke_info_list[enemy_poke["name"]].terastal != "":
-        data = enemy_poke_info_list[enemy_poke.name]
+        data = enemy_poke_info_list[enemy_poke["name"]]
         multi = move_type[Weakness[data.terastal.upper()].index]
     else:
         multi = move_type[Weakness[enemy_poke["type_1"].upper()].index]
         if "type_2" in enemy_poke:
             multi *= move_type[Weakness[enemy_poke["type_2"].upper()].index]
 
-    if move["type"] == poke_data["type_1"]:
-        if poke.terastal == poke_data["type_1"]:
+    terastal_check = False
+
+    if poke.terastal == poke_data["type_1"]:
+        terastal_check = True
+        multi *= 2.0
+    elif move["type"] == poke_data["type_1"]:
+        multi *= 1.5
+    if "type_2" in poke_data:
+        if poke.terastal == poke_data["type_2"]:
+            terastal_check = True
             multi *= 2.0
-        else:
+        elif move["type"] == poke_data["type_2"]:
             multi *= 1.5
-    elif "type_2" in poke_data:
-        if move["type"] == poke_data["type_2"]:
-            if poke.terastal == poke_data["type_2"]:
-                multi *= 2.0
-            else:
-                multi *= 1.5
-    if poke.terastal == move["type"]:
+    if poke.terastal == move["type"] and not terastal_check:
         multi *= 1.5
 
     if poke.held_item != HeldItem.NONE and enable_held_item.get():
@@ -1003,16 +1079,17 @@ def attack_cal(poke, poke_data, enemy_poke, move):
         else:
             multi *= poke.held_item.multi[1]
     multi *= poke.game_upper[1]
+    frac = Fraction(1, 1)
     if enemy_poke["name"] in enemy_poke_info_list:
-        multi *= enemy_poke_info_list[enemy_poke["name"]].game_upper[2]
+        frac = enemy_poke_info_list[enemy_poke["name"]].game_upper[2]
     power = move["power"]
     attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
                    poke.character.upper[1])
     health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
     h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
     h4 = floor((enemy_poke["H"] * 2 + 31 + 4 / 4) * 50 / 100 + 50 + 10)
-    defense = floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-    b252 = floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
+    defense = floor(floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * frac)
+    b252 = floor(floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * frac)
     b_max = b252 * 1.1
     damage_min = floor(floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi) * 0.86)
     damage_max = floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi)
@@ -1052,25 +1129,27 @@ def sp_attack_cal(poke, poke_data, enemy_poke, move):
 
     move_type = Weakness[move["type"].upper()].multi
     if enemy_poke["name"] in enemy_poke_info_list and enemy_poke_info_list[enemy_poke["name"]].terastal != "":
-        data = enemy_poke_info_list[enemy_poke.name]
+        data = enemy_poke_info_list[enemy_poke["name"]]
         multi = move_type[Weakness[data.terastal.upper()].index]
     else:
         multi = move_type[Weakness[enemy_poke["type_1"].upper()].index]
         if "type_2" in enemy_poke:
             multi *= move_type[Weakness[enemy_poke["type_2"].upper()].index]
 
-    if move["type"] == poke_data["type_1"]:
-        if poke.terastal == poke_data["type_1"]:
+    terastal_check = False
+
+    if poke.terastal == poke_data["type_1"]:
+        terastal_check = True
+        multi *= 2.0
+    elif move["type"] == poke_data["type_1"]:
+        multi *= 1.5
+    if "type_2" in poke_data:
+        if poke.terastal == poke_data["type_2"]:
+            terastal_check = True
             multi *= 2.0
-        else:
+        elif move["type"] == poke_data["type_2"]:
             multi *= 1.5
-    elif "type_2" in poke_data:
-        if move["type"] == poke_data["type_2"]:
-            if poke.terastal == poke_data["type_2"]:
-                multi *= 2.0
-            else:
-                multi *= 1.5
-    if poke.terastal == move["type"]:
+    if poke.terastal == move["type"] and not terastal_check:
         multi *= 1.5
 
     if poke.held_item != HeldItem.NONE and enable_held_item.get():
@@ -1080,16 +1159,18 @@ def sp_attack_cal(poke, poke_data, enemy_poke, move):
         else:
             multi *= poke.held_item.multi[3]
     multi *= poke.game_upper[3]
+
+    frac = Fraction(1, 1)
     if enemy_poke["name"] in enemy_poke_info_list:
-        multi *= enemy_poke_info_list[enemy_poke["name"]].game_upper[4]
+        frac = enemy_poke_info_list[enemy_poke["name"]].game_upper[4]
     power = move["power"]
     special_attack = floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
                            poke.character.upper[3])
     health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
     h4 = floor((enemy_poke["H"] * 2 + 31 + 4 / 4) * 50 / 100 + 50 + 10)
     h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
-    sp_defense = floor((enemy_poke["D"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-    d252 = floor((enemy_poke["D"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
+    sp_defense = floor(floor((enemy_poke["D"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * frac)
+    d252 = floor(floor((enemy_poke["D"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * frac)
     d_max = d252 * 1.1
     damage_min = floor(floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi) * 0.86)
     damage_max = floor(floor(floor(22 * power * special_attack / sp_defense) / 50 + 2) * multi)
@@ -1131,7 +1212,7 @@ def damage_calculate():
     global move_h252_damage_list
     global move_hbd252_damage_list
     global poke_list_list, move_list_list, move_damage_list_list, move_h252_damage_list_list, move_hbd252_damage_list_list
-    global move_h4_damage_list_list, move_h4_damage_list, move_max_damage_list, move_max_damage_list_list
+    global move_h4_damage_list_list, move_h4_damage_list, move_max_damage_list, move_max_damage_list_list,enable_prevent_terastal
     if poke_spec_suggest.get() == "" or enemy_poke_suggest.get() == "":
         return
     if poke_spec_suggest.get() not in pick_poke_list:
@@ -1141,6 +1222,9 @@ def damage_calculate():
     poke = pick_poke_list[poke_spec_suggest.get()]
     poke_data = pokemon_data[poke_spec_suggest.get()]
     enemy_poke = pokemon_data[enemy_poke_suggest.get()]
+
+    if enable_prevent_terastal.get():
+        poke.terastal = poke.prevent_terastal
 
     for index, poke_move in enumerate(poke.moves):
         if poke_move == "":
@@ -1230,12 +1314,14 @@ def irregular_cal(poke, poke_data, enemy_poke, move):
     if move["name"] == "テラバースト":
         if poke.terastal != "":
             move["type"] = poke.terastal
+            if check_a_c_state(poke, poke_data) == "Ph":
+                cal = attack_cal(poke, poke_data, enemy_poke, move)
+            else:
+                cal = sp_attack_cal(poke, poke_data, enemy_poke, move)
         else:
             move["type"] = "normal"
-        if check_a_c_state(poke, poke_data) == "Ph":
-            cal = attack_cal(poke, poke_data, enemy_poke, move)
-        else:
             cal = sp_attack_cal(poke, poke_data, enemy_poke, move)
+
         return cal
 
     def grass_knock_or_kick():
@@ -1292,18 +1378,22 @@ def irregular_cal(poke, poke_data, enemy_poke, move):
             if "type_2" in enemy_poke:
                 multi *= move_type[Weakness[enemy_poke["type_2"].upper()].index]
 
+        terastal_check = False
+
         if move["type"] == poke_data["type_1"]:
             if poke.terastal == poke_data["type_1"]:
+                terastal_check = True
                 multi *= 2.0
             else:
                 multi *= 1.5
         elif "type_2" in poke_data:
             if move["type"] == poke_data["type_2"]:
                 if poke.terastal == poke_data["type_2"]:
+                    terastal_check = True
                     multi *= 2.0
                 else:
                     multi *= 1.5
-        if poke.terastal == move["type"]:
+        if poke.terastal == move["type"] and not terastal_check:
             multi *= 1.5
 
         if poke.held_item != HeldItem.NONE and enable_held_item.get():
@@ -1313,16 +1403,17 @@ def irregular_cal(poke, poke_data, enemy_poke, move):
             else:
                 multi *= poke.held_item.multi[2]
         multi *= poke.game_upper[2]
+        frac = Fraction(1, 1)
         if enemy_poke["name"] in enemy_poke_info_list:
-            multi *= enemy_poke_info_list[enemy_poke["name"]].game_upper[2]
+            frac = enemy_poke_info_list[enemy_poke["name"]].game_upper[2]
         power = move["power"]
         attack = floor(((poke_data["B"] * 2 + poke.state["B"] + poke.upper["B"] / 4) * 50 / 100 + 5) *
                        poke.character.upper[2])
         health = floor((enemy_poke["H"] * 2 + 31 + 0 / 4) * 50 / 100 + 50 + 10)
         h252 = floor((enemy_poke["H"] * 2 + 31 + 252 / 4) * 50 / 100 + 50 + 10)
         h4 = floor((enemy_poke["H"] * 2 + 31 + 4 / 4) * 50 / 100 + 50 + 10)
-        defense = floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-        b252 = floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
+        defense = floor(floor((enemy_poke["B"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * frac)
+        b252 = floor(floor((enemy_poke["B"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * frac)
         b_max = b252 * 1.1
         damage_min = floor(floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi) * 0.86)
         damage_max = floor(floor(floor(22 * power * attack / defense) / 50 + 2) * multi)
@@ -1354,25 +1445,26 @@ def irregular_cal(poke, poke_data, enemy_poke, move):
 
 
 def check_a_c_state(poke, poke_data):
-    attack = floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
-                   poke.character.upper[1]) * poke.game_upper[1]
+    attack = floor(floor(((poke_data["A"] * 2 + poke.state["A"] + poke.upper["A"] / 4) * 50 / 100 + 5) *
+                         poke.character.upper[1]) * poke.game_upper[1])
 
-    special_attack = floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
-                           poke.character.upper[3]) * poke.game_upper[3]
+    special_attack = floor(floor(((poke_data["C"] * 2 + poke.state["C"] + poke.upper["C"] / 4) * 50 / 100 + 5) *
+                                 poke.character.upper[3]) * poke.game_upper[3])
 
     if attack > special_attack:
         return "Ph"
     else:
         return "Sp"
 
+
 def set_poke_s():
     global pick_poke_s, enemy_poke_s, poke_spec_suggest, enemy_poke_suggest
     if poke_spec_suggest.get() != "" and poke_spec_suggest.get() in pick_poke_list:
         poke = pick_poke_list[poke_spec_suggest.get()]
         poke_data = pokemon_data[poke_spec_suggest.get()]
-        s = floor(
+        s = floor(floor(
             floor((poke_data["S"] * 2 + poke.state["S"] + poke.upper["S"] / 4) * 50 / 100 + 5) * poke.character.upper[
-                5])
+                5]) * poke.game_upper[5])
 
         if enable_held_item.get():
             s = floor(s * poke.held_item.multi[5])
@@ -1381,13 +1473,17 @@ def set_poke_s():
         poke_data = pokemon_data[enemy_poke_suggest.get()]
         if poke_data["name"] == "List":
             return
-        slowest_s = floor(floor((poke_data["S"] * 2 + 0 + 0 / 4) * 50 / 100 + 5) * 0.9)
-        slow_s = floor(floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * 0.9)
-        normal_s = floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5)
-        fast_s = floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5)
-        fastest_s = floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.1)
-        fast_scarf_s = floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.5)
-        fastest_scarf_s = floor(floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.1) * 1.5)
+        frac = Fraction(1, 1)
+        if poke_data["name"] in enemy_poke_info_list.keys():
+            frac = enemy_poke_info_list[poke_data["name"]].game_upper[5]
+        slowest_s = floor(floor(floor((poke_data["S"] * 2 + 0 + 0 / 4) * 50 / 100 + 5) * 0.9) * frac)
+        slow_s = floor(floor(floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * 0.9) * frac)
+        normal_s = floor(floor((poke_data["S"] * 2 + 31 + 0 / 4) * 50 / 100 + 5) * frac)
+        fast_s = floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * frac)
+        fastest_s = floor(floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.1) * frac)
+        fast_scarf_s = floor(floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.5) * frac)
+        fastest_scarf_s = floor(
+            floor(floor(floor((poke_data["S"] * 2 + 31 + 252 / 4) * 50 / 100 + 5) * 1.1) * 1.5) * frac)
         enemy_poke_s[6].set(str(int(slowest_s)))
         enemy_poke_s[5].set(str(int(slow_s)))
         enemy_poke_s[4].set(str(int(normal_s)))
@@ -1396,7 +1492,8 @@ def set_poke_s():
         enemy_poke_s[1].set(str(int(fast_scarf_s)))
         enemy_poke_s[0].set(str(int(fastest_scarf_s)))
 
-def is_rgb_near(rgb1, rgb2, rgb_range=10):
+
+def is_rgb_near(rgb1, rgb2, rgb_range=20):
     r1, g1, b1 = rgb1
     r2, g2, b2 = rgb2
     if abs(r1 - r2) < rgb_range and abs(g1 - g2) < rgb_range and abs(b1 - b2) < rgb_range:
@@ -1406,63 +1503,63 @@ def is_rgb_near(rgb1, rgb2, rgb_range=10):
 
 
 def state_check(frame):
+    global text_builder
     _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame, state_check_image, cv2.TM_CCOEFF_NORMED))
     if max_val > 0.98:
 
         terastal_types = {}
 
         for type_name, image in terastal_types_image.items():
-            _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame, image, cv2.TM_CCOEFF_NORMED))
-            print(type_name + ": " + str(max_val))
+            _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame[216:281, 162:227], image, cv2.TM_CCOEFF_NORMED))
             if max_val > 0.82:
                 terastal_types[max_val] = type_name
-                break
 
-        terastal_type = terastal_types[max(terastal_types.keys())]
+        terastal_type = ""
 
+        if len(terastal_types) != 0:
+            terastal_type = terastal_types[max(terastal_types.keys())]
+
+        color = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         # 40x 60x
         up_states = [0, 0, 0, 0, 0]
         for i in range(0, 5):
             y_loc = 595 + i * 60
             for i_2 in range(0, 6):
                 x_loc = 500 + i_2 * 40
-                if is_rgb_near(frame[y_loc][x_loc], (100, 220, 0)):
+                if is_rgb_near(color[y_loc][x_loc], (100, 220, 0)):
                     up_states[i] += 1
-                if is_rgb_near(frame[y_loc][x_loc], (255, 62, 64)):
+                if is_rgb_near(color[y_loc][x_loc], (230, 50, 55)):
                     up_states[i] -= 1
 
-        up_fractions = []
+        up_fractions = [Fraction(1, 1)]
         for i in up_states:
             if i > 0:
                 up_fractions.append(Fraction(i + 2, 2))
             elif i < 0:
-                up_fractions.append(Fraction(2, i + 2))
+                up_fractions.append(Fraction(2, abs(i) + 2))
             else:
                 up_fractions.append(Fraction(1, 1))
 
         _, my_poke_max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame, check_my_poke_image, cv2.TM_CCOEFF_NORMED))
-        print("my_poke_max_val: " + str(my_poke_max_val))
         poke = frame[88:125, 165:410]  # 88:165, 120:410
         poke = cv2.cvtColor(poke, cv2.COLOR_BGR2GRAY)
         poke = cv2.threshold(poke, 200, 255, cv2.THRESH_BINARY)[1]
         if my_poke_max_val > 0.8:
-            pokemon = tool.image_to_string(Image.fromarray(poke), lang="jpn")
-            print(pokemon)
+            pokemon = tool.image_to_string(cv2pil(poke), lang="jpn", builder=text_builder)
             for key, value in pick_poke_list.items():
                 lev_dist = string_distance(pokemon, key)
-                print(lev_dist)
                 if lev_dist > 0.55:
                     data = pick_poke_list[key]
-                    data.terastal = terastal_type
+                    if terastal_type != "":
+                        enable_prevent_terastal.set(False)
+                        data.terastal = terastal_type
                     data.game_upper = up_fractions
                     upper_suggest.set(str(up_fractions))
                     terastal_type_suggest.set(terastal_type)
-                    print(up_fractions)
-                    print(terastal_type)
                     break
 
         else:
-            image = Image.fromarray(poke)
+            image = cv2pil(poke)
 
             if check_one_lang.get():
                 lang = one_lang.get()
@@ -1507,7 +1604,8 @@ def state_check(frame):
                     x = near_data[lev]
                     data = PokeData()
                     data.game_upper = up_fractions
-                    data.terastal = terastal_type
+                    if terastal_type != "":
+                        data.terastal = terastal_type
                     enemy_poke_info_list[x] = data
                     enemy_upper_suggest.set(str(up_fractions))
                     enemy_terastal_type_suggest.set(terastal_type)
@@ -1562,10 +1660,20 @@ def state_check(frame):
                 x = near_data[lev]
                 data = PokeData()
                 data.game_upper = up_fractions
-                data.terastal = terastal_type
+                if terastal_type != "":
+                    data.terastal = terastal_type
                 enemy_poke_info_list[x] = data
                 enemy_upper_suggest.set(str(up_fractions))
                 enemy_terastal_type_suggest.set(terastal_type)
+
+def initialize_check(frame):
+    global enable_prevent_terastal
+    _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame, initialize_check_image, cv2.TM_CCOEFF_NORMED))
+    if max_val > 0.9:
+        enable_prevent_terastal.set(False)
+        for poke in pick_poke_list.values():
+            poke.terastal = ""
+        enemy_poke_info_list.clear()
 
 
 def main_task():
@@ -1616,15 +1724,15 @@ def main_task():
         while camera.read()[0] and not end:
             ret, frame = camera.read()
             try:
-                execute_time = time.time()
                 frame_to_move(frame)
                 frame_to_pokemon(frame)
                 frame_to_enemy_pokemon(frame)
                 threading.Thread(target=state_check, args=(frame,)).start()
                 threading.Thread(target=set_poke_s).start()
+                threading.Thread(target=initialize_check, args=(frame,)).start()
                 damage_calculate()
-                time.sleep(60 / config_yml["fps"])
-                print("delay: " + str(time.time() - execute_time))
+                time.sleep(config_yml["delay"])
+
             except RuntimeError:
                 break
         camera.release()
@@ -1657,5 +1765,3 @@ def main_task():
 
 if __name__ == '__main__':
     main_task()
-
-

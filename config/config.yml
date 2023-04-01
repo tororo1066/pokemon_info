@@ -3,7 +3,11 @@ size:
   width: 1920
 fps: 60
 cameraIndex: 1
+delay: 0
 obs:
   host: localhost
   port: 4444
   pass: tororo
+
+
+
