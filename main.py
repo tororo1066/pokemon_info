@@ -181,6 +181,7 @@ move_max_damage_list_list: list[list[tk.StringVar]] = list()
 pick_poke_s: tk.StringVar
 enemy_poke_s: list[tk.StringVar] = list()
 
+os.mkdir(os.path.abspath("party"))
 state_check_image = cv2.imread(os.path.abspath("compareImages/state_check.png"))
 check_my_poke_image = cv2.imread(os.path.abspath("compareImages/check_my_poke.png"))
 initialize_check_image = cv2.imread(os.path.abspath("compareImages/initialize_check.png"))
