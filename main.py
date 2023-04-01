@@ -181,7 +181,10 @@ move_max_damage_list_list: list[list[tk.StringVar]] = list()
 pick_poke_s: tk.StringVar
 enemy_poke_s: list[tk.StringVar] = list()
 
-os.mkdir(os.path.abspath("party"))
+try:
+    os.mkdir(os.path.abspath("party"))
+except FileExistsError:
+    pass
 state_check_image = cv2.imread(os.path.abspath("compareImages/state_check.png"))
 check_my_poke_image = cv2.imread(os.path.abspath("compareImages/check_my_poke.png"))
 initialize_check_image = cv2.imread(os.path.abspath("compareImages/initialize_check.png"))
@@ -1511,7 +1514,7 @@ def state_check(frame):
         terastal_types = {}
 
         for type_name, image in terastal_types_image.items():
-            _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame[216:281, 162:227], image, cv2.TM_CCOEFF_NORMED))
+            _, max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame[int(get_height() * 0.2):int(get_height() * 0.2602), int(get_width() * 0.084):int(get_width() * 0.118)], image, cv2.TM_CCOEFF_NORMED))
             if max_val > 0.82:
                 terastal_types[max_val] = type_name
 
@@ -1524,9 +1527,9 @@ def state_check(frame):
         # 40x 60x
         up_states = [0, 0, 0, 0, 0]
         for i in range(0, 5):
-            y_loc = 595 + i * 60
+            y_loc = int(get_height() * 0.5509) + i * int(get_height() * 0.0555)
             for i_2 in range(0, 6):
-                x_loc = 500 + i_2 * 40
+                x_loc = int(get_width() * 0.2604) + i_2 * int(get_width() * 0.0208)
                 if is_rgb_near(color[y_loc][x_loc], (100, 220, 0)):
                     up_states[i] += 1
                 if is_rgb_near(color[y_loc][x_loc], (230, 50, 55)):
@@ -1542,7 +1545,7 @@ def state_check(frame):
                 up_fractions.append(Fraction(1, 1))
 
         _, my_poke_max_val, _, _ = cv2.minMaxLoc(cv2.matchTemplate(frame, check_my_poke_image, cv2.TM_CCOEFF_NORMED))
-        poke = frame[88:125, 165:410]  # 88:165, 120:410
+        poke = frame[int(get_height() * 0.0815):int(get_height() * 0.1157), int(get_width() * 0.0860):int(get_width() * 0.2135)]  # 88:165, 120:410
         poke = cv2.cvtColor(poke, cv2.COLOR_BGR2GRAY)
         poke = cv2.threshold(poke, 200, 255, cv2.THRESH_BINARY)[1]
         if my_poke_max_val > 0.8:
